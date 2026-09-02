@@ -86,7 +86,9 @@ from agent_common import (  # noqa: E402
     RUN_SQL_RE as _RUN_SQL_RE,
 )
 
-CODEX_BIN = os.getenv("CODEX_BIN", "codex")
+# shutil.which resolves the platform's actual executable (codex.cmd on
+# Windows, codex elsewhere); bare names in subprocess skip that resolution.
+CODEX_BIN = os.getenv("CODEX_BIN") or shutil.which("codex") or "codex"
 CODEX_MODEL = os.getenv("CODEX_MODEL")
 CODEX_REASONING_EFFORT = os.getenv("CODEX_REASONING_EFFORT", "low")
 CODEX_SANDBOX = os.getenv("CODEX_SANDBOX", "read-only")
@@ -154,10 +156,10 @@ def _codex_call(prompt: str) -> str:
         ]
         if CODEX_MODEL:
             cmd += ["-m", CODEX_MODEL]
-        cmd.append(prompt)
+        cmd.append("-")
         try:
             proc = subprocess.run(
-                cmd, stdin=subprocess.DEVNULL, capture_output=True, text=True,
+                cmd, input=prompt, capture_output=True, text=True, encoding="utf-8",
                 timeout=CODEX_TIMEOUT, env=_cli_env(),
             )
             raw = ""

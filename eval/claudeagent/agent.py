@@ -45,6 +45,7 @@ Config (env vars, all optional):
 import os
 import sys
 import time
+import shutil
 import subprocess
 
 # Shared, backend-agnostic primitives (eval/agent_common.py). eval/ is this
@@ -68,7 +69,9 @@ from agent_common import (  # noqa: E402
     RUN_SQL_RE as _RUN_SQL_RE,
 )
 
-CLAUDE_BIN = os.getenv("CLAUDE_BIN", "claude")
+# shutil.which resolves the platform's actual executable (claude.cmd on
+# Windows, claude elsewhere); bare names in subprocess skip that resolution.
+CLAUDE_BIN = os.getenv("CLAUDE_BIN") or shutil.which("claude") or "claude"
 CLAUDE_MODEL = os.getenv("CLAUDE_MODEL")  # None -> claude's default model; e.g. "opus", "sonnet"
 CLAUDE_EFFORT = os.getenv("CLAUDE_EFFORT")  # None -> default; e.g. "high" (--effort)
 CLAUDE_TIMEOUT = int(os.getenv("CLAUDE_TIMEOUT", "300"))
@@ -98,7 +101,7 @@ def _claude_call(prompt: str) -> str:
     for attempt in range(CLAUDE_MAX_RETRIES + 1):
         try:
             proc = subprocess.run(
-                cmd, input=prompt, capture_output=True, text=True,
+                cmd, input=prompt, capture_output=True, text=True, encoding="utf-8",
                 timeout=CLAUDE_TIMEOUT, env=_cli_env(),
             )
         except subprocess.TimeoutExpired:
