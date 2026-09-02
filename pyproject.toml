@@ -1,0 +1,36 @@
+[project]
+name = "beaver"
+version = "0.1.0"
+description = "BEAVER: an enterprise benchmark for text-to-SQL — evaluation code"
+readme = "README.md"
+requires-python = ">=3.10,<3.13"
+dependencies = [
+    # eval/requirements.txt
+    "func_timeout",
+    "numpy",
+    "openai",
+    "pandas",
+    "spacy",
+    "sqlglot",
+    "tqdm",
+    "mysql-connector-python",
+    "python-dotenv",
+    "sqlparse",
+    "sql_metadata",
+    "tabulate",
+    "nltk",
+    "tiktoken",
+    "torch",
+    # data/download_hf.py
+    "datasets",
+    # retrieve/retrieve.py + rerank.py
+    "transformers",
+    "sentence-transformers",
+    "scikit-learn",
+    "huggingface-hub>=1.21.0",  # provides the `hf` CLI (used to log in for the gated dataset)
+]
+
+# The scripts are run by path (e.g. `python eval/evaluate_ex_acc.py`), not installed
+# as a package, so tell uv to manage the environment without building this project.
+[tool.uv]
+package = false

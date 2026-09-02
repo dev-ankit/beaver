@@ -1,0 +1,4 @@
+# Raw per-run generation artifacts (regenerable; can be large). The meaningful
+# results are captured in RESULTS.md; full SQL outputs live under
+# eval/unified-output/ (gitignored: contains gold SQL from the gated dataset).
+output/
