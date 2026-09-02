@@ -6,10 +6,12 @@ Policy (gold-blind):
   1. Execute Claude's answer and all Codex candidates. If Claude's result set
      matches a Codex candidate, select that candidate (cross-model concurrence;
      lowest index on ties).
-  2. Otherwise ask a judge (claude -p) to pick among the Codex candidates from
-     their executed result previews. If <codex_run>/summary_judge.json already
-     exists (from judge.py), its stored picks are reused; otherwise the judge is
-     called here.
+  2. Otherwise ask a judge (claude -p, all tools disabled, DB credentials
+     stripped) to pick among the Codex candidates from their executed result
+     previews. If <codex_run>/summary_judge.json already exists (from judge.py),
+     its stored picks are reused; otherwise the judge is called here. Judge
+     failures are retried once, then counted; the script exits 2 if any remain
+     (candidate 1 is kept on those questions).
   3. Write <out>/generated/<id>.sql (the selected candidate only) and copy gold/.
 
 Usage (from eval/):
@@ -17,11 +19,12 @@ Usage (from eval/):
 Then: python evaluate_ex_acc.py --dataset <dataset> --input_dir <out_dir>
 The dataset (dw_real, dw, nova, neutron) is read from the codex run directory name.
 """
+import re
 import sys
 import json
 import shutil
 from pathlib import Path
-import pandas as pd
+from collections import Counter
 from _common import run_dir, candidates, dev_questions, EVAL
 from utils.ex_acc import get_mysql_credentials, execute_sql_with_timeout, compare_results
 
@@ -31,7 +34,6 @@ out = Path(sys.argv[3]) if len(sys.argv) > 3 else EVAL / "unified-output" / "con
 (out / "generated").mkdir(parents=True, exist_ok=True)
 (out / "gold").mkdir(parents=True, exist_ok=True)
 
-import re
 m = re.search(r"beaver-(dw_real|dw|nova|neutron)-", codex_dir.name)
 DATASET = m.group(1) if m else "dw_real"
 creds = get_mysql_credentials(DATASET)
@@ -41,9 +43,10 @@ questions = dev_questions(DATASET)
 
 if not stored:
     sys.path.insert(0, str(EVAL / "selectors"))
-    from judge import ask_judge, preview  # noqa: E402
+    from judge import ask_judge, candidate_blocks  # noqa: E402
 
 log = []
+judge_errors = []
 for gf in sorted((codex_dir / "generated").glob("*.sql")):
     qid = gf.stem
     cands = candidates(gf.read_text(encoding="utf-8"))
@@ -61,16 +64,23 @@ for gf in sorted((codex_dir / "generated").glob("*.sql")):
         if qid in stored:
             pick, how = min(stored[qid] - 1, len(cands) - 1), f"judge(stored):c{stored[qid]}"
         else:
-            blocks = [f"CANDIDATE {i+1} SQL:\n{c[:2500]}\n\nCANDIDATE {i+1} EXECUTED RESULT:\n{preview(df, err)}"
-                      for i, (c, (df, err)) in enumerate(zip(cands, execs))]
-            j, _ = ask_judge(questions[qid]["question"], blocks)
-            pick, how = min(j, len(cands) - 1), f"judge:c{j+1}"
+            j, _, jerr = ask_judge(questions[qid]["question"], candidate_blocks(cands, execs))
+            if jerr:
+                j, _, jerr = ask_judge(questions[qid]["question"], candidate_blocks(cands, execs))  # one retry
+            if jerr:
+                judge_errors.append(qid)
+                print(f"{qid}: JUDGE ERROR, candidate 1 kept: {jerr}", flush=True)
+                pick, how = 0, "judge-error:c1"
+            else:
+                pick, how = min(j, len(cands) - 1), f"judge:c{j+1}"
     (out / "generated" / f"{qid}.sql").write_text(cands[pick], encoding="utf-8")
     shutil.copy(codex_dir / "gold" / f"{qid}.sql", out / "gold" / f"{qid}.sql")
     log.append({"id": qid, "selected": pick + 1, "how": how})
 
 json.dump(log, open(out / "concur_selection.json", "w", encoding="utf-8"), indent=2)
-from collections import Counter
 print(f"wrote {len(log)} single-answer predictions to {out}")
 print("selection sources:", dict(Counter(x["how"].split(":")[0] for x in log)))
 print(f"score with: python evaluate_ex_acc.py --dataset {DATASET} --input_dir {out.relative_to(EVAL) if out.is_relative_to(EVAL) else out}")
+if judge_errors:
+    print(f"JUDGE ERRORS on {len(judge_errors)} questions (candidate 1 kept there): {judge_errors}", file=sys.stderr)
+    sys.exit(2)

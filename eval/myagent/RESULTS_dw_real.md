@@ -29,19 +29,28 @@ a pass@1.
 | Setting | Config | dw pass@1 | dw pass@3 | dw_real pass@1 | dw_real pass@3 |
 |:---:|---|:---:|:---:|:---:|:---:|
 | 1 | Paper, ReFoRCE* | 18.9 | not reported | 18.9 | not reported |
-| 1 | Concur (generator + selector), GPT-5.6 + Opus 5 | pending | n.a. | 29.8 | n.a. |
+| 1 | Concur (generator + selector), GPT-5.6 + Opus 5 | 28.0 | n.a. | 29.8 | n.a. |
 | 2 | Paper, ReFoRCE* | 25.9 | not reported | 25.9 | not reported |
 | 2 | Paper, Few-shot* | 23.1 | not reported | 23.1 | not reported |
 | 2 | GPT-5.5, one query, repair only | 30 | n.a. | not run | n.a. |
 | 2 | Concur's generator, GPT-5.5 | 39 | 49 | not run | not run |
 | 2 | Plain GPT-5.6, one query, no techniques | 38.0 | n.a. | 35.5 | n.a. |
 | 2 | Claude Opus 5, one query, exploration and repair | 39.0 | n.a. | 30.6 | n.a. |
-| 2 | Concur's generator, GPT-5.6 | 33 | 49 | 29.8 | 47.9 |
-| 2 | Concur (generator + selector), GPT-5.6 + Opus 5 | pending | n.a. | 38.0 | n.a. |
+| 2 | Concur's generator, GPT-5.6 | 32 | 47 | 29.8 | 47.9 |
+| 2 | Concur (generator + selector), GPT-5.6 + Opus 5 | 38.0 | n.a. | 38.0 | n.a. |
 
 *Paper rows (arXiv 2409.02038v3, Table 6) are the whole benchmark, all three
 warehouses, averaged over seven models; the paper reports no per-question-set
-numbers at Settings 1 and 2. The GPT-5.5 rows are from `RESULTS.md`.
+numbers at Settings 1 and 2. The GPT-5.5 rows are from `RESULTS.md`; its
+GPT-5.6 rerun of the same generator config scored 33 / 49, one seed apart from
+the 32 / 47 run used here. At Setting 1 on `dw` the generator scores 25 / 34
+and Claude Opus 5 with exploration and repair 31.0.
+
+The judge stage is a model call with no temperature control, so its picks
+vary between runs. Three independent judge passes on the same `dw_real`
+Setting 2 candidates gave Concur 36.4, 40.5, and 37.2 (mean 38.0, which is
+the number in the table); the `dw` cells are single passes. Cross-model
+concurrence, which decides 42% of the questions, is deterministic.
 
 The experiments run on different model generations to decouple technique from
 model improvements. On `dw` the generator's techniques lift GPT-5.5 from 30 to
